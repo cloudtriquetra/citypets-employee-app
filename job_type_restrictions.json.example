@@ -1,0 +1,53 @@
+{
+  "training": [
+    "EMPLOYEE_1"
+  ],
+  "hotel": [
+    "EMPLOYEE_1",
+    "EMPLOYEE_2",
+    "EMPLOYEE_3"
+  ],
+  "walk": [
+    "EMPLOYEE_1",
+    "EMPLOYEE_2",
+    "EMPLOYEE_3"
+  ],
+  "overnight_hotel": [
+    "EMPLOYEE_1",
+    "EMPLOYEE_2"
+  ],
+  "cat_visit": [
+    "EMPLOYEE_2",
+    "EMPLOYEE_3"
+  ],
+  "pet_sitting_hourly": [
+    "EMPLOYEE_1",
+    "EMPLOYEE_2",
+    "EMPLOYEE_3"
+  ],
+  "overnight_pet_sitting": [
+    "EMPLOYEE_1",
+    "EMPLOYEE_2"
+  ],
+  "dog_at_home": [
+    "EMPLOYEE_1",
+    "EMPLOYEE_2"
+  ],
+  "cat_at_home": [
+    "EMPLOYEE_2",
+    "EMPLOYEE_3"
+  ],
+  "management": [
+    "EMPLOYEE_1"
+  ],
+  "transport": [
+    "EMPLOYEE_1",
+    "EMPLOYEE_2",
+    "EMPLOYEE_3"
+  ],
+  "transport_km": [
+    "EMPLOYEE_1",
+    "EMPLOYEE_2",
+    "EMPLOYEE_3"
+  ]
+}

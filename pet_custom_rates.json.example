@@ -1,0 +1,10 @@
+{
+  "Pet Name 1": {
+    "pet_sitting_hourly": 20,
+    "walk": 30
+  },
+  "Pet Name 2": {
+    "hotel": 35,
+    "cat_visit": 40
+  }
+}

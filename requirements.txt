@@ -1,0 +1,22 @@
+# CityPets Employee Timesheet Application Dependencies
+
+# Core application framework
+streamlit>=1.28.0
+
+# Data processing and manipulation
+pandas>=2.0.0
+
+# Excel export functionality
+openpyxl>=3.1.0
+
+# Data visualization and charts
+plotly>=5.17.0
+
+# Required by Streamlit and data processing
+MarkupSafe>=2.1
+
+# Optional dependencies for future enhancement:
+# python-dotenv>=1.0.0  # For environment configuration
+# requests>=2.31.0      # For HTTP requests to external APIs
+# bcrypt>=4.0.0         # For password hashing if implementing user auth
+# sqlalchemy>=2.0.0     # If migrating from SQLite to PostgreSQL
