@@ -743,6 +743,85 @@ def render_advanced_login_page():
     
     user_manager = UserManager()
     
+    # Check if this is first-time setup (no users exist)
+    users = user_manager.get_all_users()
+    
+    if not users:
+        st.markdown("### 🚀 First-Time Setup")
+        st.info("👋 **Welcome!** No users found. Let's create the first administrator account.")
+        
+        with st.form("first_time_setup"):
+            st.markdown("#### Create Administrator Account")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                username = st.text_input("Username*", placeholder="admin")
+                email = st.text_input("Email*", placeholder="admin@company.com")
+                full_name = st.text_input("Full Name*", placeholder="John Smith")
+                
+            with col2:
+                employee_name = st.text_input("Employee Name*", 
+                    placeholder="Must match employees_config.json", 
+                    help="This must exactly match an entry in your employees_config.json file")
+                password = st.text_input("Password*", type="password", placeholder="Create a strong password")
+                confirm_password = st.text_input("Confirm Password*", type="password", placeholder="Confirm password")
+            
+            st.markdown("**Password Requirements:**")
+            st.markdown("- At least 8 characters long")
+            st.markdown("- Contains uppercase and lowercase letters")
+            st.markdown("- Contains at least one number")
+            st.markdown("- Contains at least one special character")
+            
+            setup_submitted = st.form_submit_button("🔧 Create Administrator Account", use_container_width=True)
+        
+        if setup_submitted:
+            # Validate all fields are filled
+            if not all([username, email, full_name, employee_name, password, confirm_password]):
+                st.error("❌ Please fill in all required fields")
+            elif password != confirm_password:
+                st.error("❌ Passwords do not match")
+            else:
+                # Validate password strength
+                is_valid, errors = user_manager.validate_password_strength(password)
+                
+                if not is_valid:
+                    st.error("❌ Password does not meet requirements:")
+                    for error in errors:
+                        st.error(f"  • {error}")
+                else:
+                    # Create the first admin user
+                    success, message = user_manager.create_user(
+                        username=username,
+                        email=email,
+                        password=password,
+                        full_name=full_name,
+                        employee_name=employee_name,
+                        role="admin",
+                        is_temp_password=False
+                    )
+                    
+                    if success:
+                        st.success("✅ Administrator account created successfully!")
+                        st.success("🎉 You can now login with your credentials")
+                        st.balloons()
+                        
+                        # Auto-refresh to show login form
+                        if st.button("Continue to Login"):
+                            st.rerun()
+                    else:
+                        st.error(f"❌ Failed to create account: {message}")
+        
+        # Show helpful information
+        st.markdown("---")
+        st.markdown("### 💡 Setup Tips")
+        st.markdown("- **Employee Name** must exactly match an entry in `employees_config.json`")
+        st.markdown("- **Administrator** role gives access to all features")
+        st.markdown("- You can create additional employee accounts after login")
+        st.markdown("- Ensure you remember your password - password reset requires manual intervention")
+        
+        return  # Exit early to show only setup form
+    
     # Check if user needs to change password (temporary password)
     if st.session_state.get('force_password_change', False):
         user_data = st.session_state.get('temp_user_data')

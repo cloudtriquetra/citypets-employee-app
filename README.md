@@ -71,7 +71,52 @@ streamlit run main.py
 
 The application will be available at `http://localhost:8501`
 
-## 🔧 Configuration Guide
+## � First-Time Setup & Login
+
+### Initial Admin Setup
+
+The application uses a secure user authentication system. On the **first run**, you'll automatically see the setup page:
+
+1. **Start the application**: `streamlit run main.py`
+2. **Access the app**: Go to `http://localhost:8501`
+3. **Automatic Setup Prompt**: 
+   - If no users exist, you'll see a "First-Time Setup" form instead of login
+   - Fill in administrator details (username, email, full name, employee name, password)
+   - **Important**: Employee name must exactly match an entry in `employees_config.json`
+   - Create a strong password following the requirements shown
+
+### Default Login Process
+
+**For Administrators:**
+1. Login with your admin credentials
+2. Navigate to "User Management" to create employee accounts
+3. Set up employee rates in "Employee Management"
+
+**For Employees:**
+1. Login with credentials provided by your administrator
+2. Complete timesheet entries
+3. View your personal reports
+
+### User Account Creation
+
+**Only administrators can create new user accounts**. To add a new employee:
+
+1. Login as admin
+2. Go to "User Management" → "Add New User"
+3. Fill in employee details:
+   - Username and email
+   - Full name and employee name (must match `employees_config.json`)
+   - Role (Admin or Employee)
+   - Initial password (user will be prompted to change)
+
+### Password Security
+
+- All passwords are securely hashed using PBKDF2
+- Temporary passwords must be changed on first login
+- Strong password requirements enforced
+- Session tokens for secure authentication
+
+## �🔧 Configuration Guide
 
 ### Employee Configuration (`employees_config.json`)
 
@@ -159,17 +204,44 @@ citypets-employee-app/
 
 ## 💡 Usage Guide
 
+### For New Installations
+1. **First Run**: Access `http://localhost:8501/?setup=true` to create the initial admin user
+2. **Admin Login**: Use your newly created admin credentials to access the system
+3. **Configure Employees**: Set up employee rates and job access in "Employee Management"
+4. **Create Employee Accounts**: Add user accounts for each employee in "User Management"
+
 ### For Employees
-1. **Login**: Use your assigned credentials
-2. **Submit Time**: Fill out the timesheet form with job details
-3. **Track Status**: View your submitted entries and payment status
-4. **Reports**: Generate personal reports for specific date ranges
+1. **Login**: Use your assigned username/email and password provided by your administrator
+2. **First-Time Password Change**: You'll be prompted to change your temporary password
+3. **Submit Time**: Fill out the timesheet form with job details
+4. **Track Status**: View your submitted entries and payment status
+5. **Reports**: Generate personal reports for specific date ranges
 
 ### For Administrators
-1. **Employee Management**: Add/remove employees and set rates
-2. **Payment Processing**: Mark entries as paid and track pending payments
-3. **Reports**: Generate comprehensive reports with analytics
-4. **Data Export**: Export data to Excel for accounting purposes
+1. **User Management**: Create and manage employee user accounts
+2. **Employee Configuration**: Set hourly rates and job type access permissions
+3. **Payment Processing**: Mark entries as paid and track pending payments
+4. **Reports & Analytics**: Generate comprehensive reports with analytics
+5. **Data Export**: Export data to Excel for accounting purposes
+
+### Navigation Menu
+
+Once logged in, you'll see different menu options based on your role:
+
+**Employee Users:**
+- 📝 Timesheet Entry
+- 📊 Employee Reports
+- 👤 Profile Settings
+
+**Admin Users:**
+- 📝 Timesheet Entry
+- 💳 Admin Dashboard (Payment Processing)
+- 📊 Reports (Comprehensive Analytics)
+- 📁 Data Export
+- 👥 Employee Management (Rates & Job Access)
+- 🔐 User Management (Account Creation)
+
+## 🔐 Security Features
 
 ## 🎯 Key Job Types
 
@@ -230,6 +302,28 @@ docker run -p 8501:8501 citypets-timesheet
 
 ## 🐛 Troubleshooting
 
+### Login Issues
+
+**Cannot access the application / No users exist:**
+- On first run, the setup form appears automatically when no users exist
+- Create the initial administrator account using the setup form
+- Ensure `employees_config.json` contains the admin's employee name
+
+**Login failed / Invalid credentials:**
+- Verify username/email and password are correct
+- Check if account is active (admins can check in User Management)
+- Ensure employee name in user account matches `employees_config.json`
+
+**Forced to change password:**
+- This is normal for temporary passwords
+- Follow the password requirements shown on screen
+- Password must be strong (8+ chars, uppercase, lowercase, numbers, symbols)
+
+**Session expired / Logged out unexpectedly:**
+- Sessions expire for security
+- Simply log in again with your credentials
+- Check browser console for any errors
+
 ### Common Issues
 
 **Database not found errors:**
@@ -239,6 +333,7 @@ docker run -p 8501:8501 citypets-timesheet
 **Configuration file errors:**
 - Copy `.example` files and customize with your data
 - Validate JSON syntax in configuration files
+- Ensure employee names in `employees_config.json` match user accounts
 
 **Missing dependencies:**
 - Run `pip install -r requirements.txt` to install all required packages
@@ -247,6 +342,12 @@ docker run -p 8501:8501 citypets-timesheet
 **Permission errors:**
 - Ensure employees are configured in `employees_config.json`
 - Check `job_type_restrictions.json` for access permissions
+- Verify user accounts exist in User Management
+
+**Employee cannot access certain job types:**
+- Check `job_type_restrictions.json` for allowed employees
+- Admin users can modify access in Employee Management
+- Ensure employee name matches exactly between config files and user account
 
 ## 🤝 Contributing
 
