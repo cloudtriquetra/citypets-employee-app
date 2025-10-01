@@ -265,22 +265,48 @@ Once logged in, you'll see different menu options based on your role:
 
 ## 🚀 Deployment
 
-### Local Deployment
+### Local Deployment (Recommended)
 - Perfect for small teams and testing
 - Uses SQLite database (included)
 - No external dependencies required
+- Simple setup: `streamlit run main.py`
 
-### Production Deployment
-- Compatible with cloud platforms (Heroku, AWS, GCP)
-- Easy migration to PostgreSQL for scaling
-- Environment variables for secure configuration
+### Server Deployment Options
 
-### Docker Support (Future)
+**Option 1: Simple Server Setup**
 ```bash
-# Will be available in future releases
-docker build -t citypets-timesheet .
-docker run -p 8501:8501 citypets-timesheet
+# On your server (Linux/macOS)
+git clone https://github.com/yourusername/citypets-employee-app.git
+cd citypets-employee-app
+pip install -r requirements.txt
+
+# Copy your configuration files
+cp employees_config.json.example employees_config.json
+cp pet_custom_rates.json.example pet_custom_rates.json
+cp job_type_restrictions.json.example job_type_restrictions.json
+
+# Edit config files with your actual data
+# Then run the application
+streamlit run main.py --server.port 8501 --server.address 0.0.0.0
 ```
+
+**Option 2: Cloud Platform (Streamlit Cloud)**
+1. Push your repository to GitHub (with config files configured)
+2. Connect to [Streamlit Cloud](https://streamlit.io/cloud)
+3. Deploy directly from your GitHub repository
+4. Set environment variables if needed
+
+**Option 3: VPS/Dedicated Server**
+- Install Python 3.8+ on your server
+- Follow the local deployment steps
+- Use a process manager like `systemd` or `supervisor` for production
+- Consider using a reverse proxy (nginx) for custom domains
+
+### Important Deployment Notes
+- **Database files** (`*.db`) will be created automatically
+- **Configuration files** must be properly set up before first run
+- **Backup strategy** recommended for production use
+- **HTTPS** recommended for production deployments
 
 ## 🔮 Roadmap
 
@@ -295,10 +321,10 @@ docker run -p 8501:8501 citypets-timesheet
 
 ### Technical Improvements
 - [ ] PostgreSQL migration option
-- [ ] Docker containerization
 - [ ] API endpoints for third-party integration
 - [ ] Enhanced security features
 - [ ] Performance optimizations
+- [ ] Automated backup system
 
 ## 🐛 Troubleshooting
 
