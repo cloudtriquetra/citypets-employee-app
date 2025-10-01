@@ -39,7 +39,7 @@ A comprehensive Streamlit-based timesheet management system designed for pet car
 
 ### 2. **Clone Repository**
 ```bash
-git clone https://github.com/yourusername/citypets-employee-app.git
+git clone https://github.com/cloudtriquetra/citypets-employee-app.git
 cd citypets-employee-app
 ```
 
