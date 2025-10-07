@@ -4113,28 +4113,21 @@ def generate_employee_personal_report(conn, current_user, start_date, end_date):
     st.dataframe(job_breakdown, use_container_width=True)
     
     # 4. CHARTS
-    col1, col2 = st.columns(2)
+    st.markdown("### 📊 Visual Analysis")
     
-    with col1:
-        st.markdown("#### 💰 Earnings by Job Type")
-        fig_earnings = px.bar(
-            job_breakdown.reset_index(), 
-            x='job_type', 
-            y='Earnings (PLN)',
-            title="Your Earnings by Job Type"
-        )
-        st.plotly_chart(fig_earnings, use_container_width=True)
+    # Single chart - Earnings by Job Type (the only meaningful comparison)
+    st.markdown("#### 💰 Earnings by Job Type")
+    fig_earnings = px.bar(
+        job_breakdown.reset_index(), 
+        x='job_type', 
+        y='Earnings (PLN)',
+        title="Your Earnings by Job Type",
+        labels={'job_type': 'Job Type', 'Earnings (PLN)': 'Earnings (PLN)'}
+    )
+    st.plotly_chart(fig_earnings, use_container_width=True)
     
-    with col2:
-        st.markdown("#### ⏰ Hours by Job Type")
-        fig_hours = px.pie(
-            job_breakdown.reset_index(), 
-            names='job_type', 
-            values='Hours Worked',
-            title="Your Hours Distribution"
-        )
-        st.plotly_chart(fig_hours, use_container_width=True)
-    
+    st.info("💡 **Note:** Hours/units cannot be meaningfully compared across different job types (hours vs nights vs visits vs days), so only earnings comparison is shown.")
+
     # 5. TIMELINE
     st.markdown("### 📅 Your Daily Earnings")
     daily_earnings = df.groupby('date')['total_amount'].sum().reset_index()
