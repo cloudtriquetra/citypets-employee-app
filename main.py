@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import requests
 import json
 import os
-# from dotenv import load_dotenv  # Not currently used but available for future expansion
+from dotenv import load_dotenv
 import plotly.express as px
 import plotly.graph_objects as go
 import uuid
@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 import threading
 import io
+import time
 
 # Import employee configuration
 from employee_config import (
@@ -38,8 +39,8 @@ JOBS_REQUIRING_PETS = [
     "cat_visit", "dog_at_home", "cat_at_home", "training"
 ]
 
-# Load environment variables (currently not used but kept for future expansion)
-# load_dotenv()
+# Load environment variables
+load_dotenv()
 
 # Constants
 DB_NAME = 'citypets_timesheet.db'
@@ -562,6 +563,8 @@ def get_timesheet_data_with_payment_filter(week_start=None, payment_status=None,
     # Add payment status filter
     if payment_status == "pending":
         query += ' AND COALESCE(payment_status, "pending") = "pending"'
+    elif payment_status == "processing":
+        query += ' AND COALESCE(payment_status, "pending") = "processing"'
     elif payment_status == "paid":
         query += ' AND COALESCE(payment_status, "pending") = "paid"'
     
@@ -736,7 +739,8 @@ def render_main_application():
         # Regular employees only see employee pages
         page_options = [
             "📝 Employee Timesheet Form", 
-            "📊 My Reports"
+            "📊 My Reports",
+            "🗑️ Manage Records"
         ]
     
     page = st.sidebar.selectbox("Choose a page", page_options)
@@ -755,6 +759,8 @@ def render_main_application():
         render_reports_page()
     elif page == "📊 My Reports":
         render_employee_reports(current_user)
+    elif page == "🗑️ Manage Records":
+        render_manage_records(current_user)
     elif page == "📁 Data Export":
         EnhancedAuthManager.require_admin()  # Ensure admin access
         render_data_export()
@@ -1714,7 +1720,7 @@ def render_admin_dashboard():
     
     # Helper function to update payment status for date range
     def mark_date_range_as_paid(employee_name, start_date_str, end_date_str):
-        """Mark all entries for an employee in a specific date range as paid"""
+        """Mark all processing entries for an employee in a specific date range as paid"""
         conn = sqlite3.connect(DB_NAME)
         cursor = conn.cursor()
         cursor.execute('''
@@ -1723,7 +1729,25 @@ def render_admin_dashboard():
             WHERE employee_name = ? 
             AND DATE(start_time) >= ? 
             AND DATE(start_time) <= ?
-            AND COALESCE(payment_status, 'pending') = 'pending'
+            AND COALESCE(payment_status, 'pending') = 'processing'
+        ''', [employee_name, start_date_str, end_date_str])
+        updated_rows = cursor.rowcount
+        conn.commit()
+        conn.close()
+        return updated_rows
+    
+    # Helper function to revert payment status from paid back to processing
+    def revert_paid_to_processing(employee_name, start_date_str, end_date_str):
+        """Revert paid entries back to processing status for an employee in a specific date range"""
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE timesheet 
+            SET payment_status = 'processing' 
+            WHERE employee_name = ? 
+            AND DATE(start_time) >= ? 
+            AND DATE(start_time) <= ?
+            AND COALESCE(payment_status, 'pending') = 'paid'
         ''', [employee_name, start_date_str, end_date_str])
         updated_rows = cursor.rowcount
         conn.commit()
@@ -1841,11 +1865,12 @@ def render_admin_dashboard():
         total_entries = len(range_data)
         total_amount = range_data['total_amount'].sum()
         pending_amount = range_data[range_data['status'] == 'pending']['total_amount'].sum()
+        processing_amount = range_data[range_data['status'] == 'processing']['total_amount'].sum()
         paid_amount = range_data[range_data['status'] == 'paid']['total_amount'].sum()
         active_employees = range_data['employee_name'].nunique()
         
         # Summary metrics
-        col1, col2, col3, col4, col5 = st.columns(5)
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
         
         with col1:
             st.metric("Total Entries", total_entries)
@@ -1857,9 +1882,12 @@ def render_admin_dashboard():
             st.metric("Pending", f"{pending_amount:.2f} PLN", delta=f"{len(range_data[range_data['status'] == 'pending'])} entries")
         
         with col4:
-            st.metric("Paid", f"{paid_amount:.2f} PLN", delta=f"{len(range_data[range_data['status'] == 'paid'])} entries")
+            st.metric("Processing", f"{processing_amount:.2f} PLN", delta=f"{len(range_data[range_data['status'] == 'processing'])} entries")
         
         with col5:
+            st.metric("Paid", f"{paid_amount:.2f} PLN", delta=f"{len(range_data[range_data['status'] == 'paid'])} entries")
+        
+        with col6:
             st.metric("Employees", active_employees)
         
         # Employee Selection and Details
@@ -1881,19 +1909,23 @@ def render_admin_dashboard():
             # Employee summary
             emp_total_amount = employee_data['total_amount'].sum()
             emp_pending_amount = employee_data[employee_data['status'] == 'pending']['total_amount'].sum()
+            emp_processing_amount = employee_data[employee_data['status'] == 'processing']['total_amount'].sum()
             emp_paid_amount = employee_data[employee_data['status'] == 'paid']['total_amount'].sum()
             emp_pending_entries = len(employee_data[employee_data['status'] == 'pending'])
+            emp_processing_entries = len(employee_data[employee_data['status'] == 'processing'])
             emp_paid_entries = len(employee_data[employee_data['status'] == 'paid'])
             
             # Employee summary display
             st.subheader(f"📋 {selected_employee} - Period Summary")
             
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("Total Amount", f"{emp_total_amount:.2f} PLN")
             with col2:
                 st.metric("Pending", f"{emp_pending_amount:.2f} PLN", delta=f"{emp_pending_entries} entries")
             with col3:
+                st.metric("Processing", f"{emp_processing_amount:.2f} PLN", delta=f"{emp_processing_entries} entries")
+            with col4:
                 st.metric("Paid", f"{emp_paid_amount:.2f} PLN", delta=f"{emp_paid_entries} entries")
             
             # Job type display mapping
@@ -1916,6 +1948,7 @@ def render_admin_dashboard():
             # Admin Edit/Delete Actions
             st.markdown("---")
             st.subheader("🔧 Admin Actions - Edit/Delete Entries")
+            st.info("**👑 Admin Privileges:** As an admin, you can edit/delete any record regardless of status. Employees can only delete their own pending records.")
             
             # Display success message if available
             if st.session_state.get('admin_success_message'):
@@ -1978,7 +2011,9 @@ def render_admin_dashboard():
                         'Duration/Amount': duration_display,
                         'Total (PLN)': f"{row['total_amount']:.2f}",
                         'Pet Names': pet_names_display,
-                        'Status': '⏳ Pending' if row['status'] == 'pending' else '✅ Paid',
+                        'Status': ('⏳ Pending' if row['status'] == 'pending' 
+                                 else '🔄 Processing' if row['status'] == 'processing' 
+                                 else '✅ Paid'),
                         'Description': row.get('description', '')[:30] + '...' if row.get('description', '') and len(row.get('description', '')) > 30 else row.get('description', ''),
                         '_id': row['id'],  # Hidden field for reference
                         '_row_data': row.to_dict()  # Store full row data
@@ -2015,7 +2050,7 @@ def render_admin_dashboard():
                     selected_entry_data = original_row.to_dict()
                     
                     # Show action buttons for single selection
-                    col1, col2, col3 = st.columns([2, 1, 1])
+                    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
                     
                     with col1:
                         st.write(f"**Selected:** {selected_entry['Date']} - {selected_entry['Job Type']} - {selected_entry['Total (PLN)']} PLN")
@@ -2033,6 +2068,33 @@ def render_admin_dashboard():
                             st.session_state.admin_delete_entry_ids = [entry_id]
                             st.session_state.admin_delete_data_list = [selected_entry_data]
                             st.rerun()
+                    
+                    with col4:
+                        # Check if the selected entry is paid
+                        is_paid_entry = 'Paid' in selected_entry.get('Status', '')
+                        
+                        if is_paid_entry:
+                            if st.button("⏪ Revert to Processing", key="revert_single_btn", type="primary", use_container_width=True):
+                                # Revert single paid entry to processing
+                                conn = sqlite3.connect(DB_NAME)
+                                cursor = conn.cursor()
+                                cursor.execute('''
+                                    UPDATE timesheet 
+                                    SET payment_status = 'processing' 
+                                    WHERE id = ?
+                                    AND COALESCE(payment_status, 'pending') = 'paid'
+                                ''', [entry_id])
+                                updated_rows = cursor.rowcount
+                                conn.commit()
+                                conn.close()
+                                
+                                if updated_rows > 0:
+                                    st.session_state.admin_success_message = f"🔄 Reverted 1 paid entry back to processing"
+                                    st.rerun()
+                                else:
+                                    st.warning("Entry was not paid or could not be reverted")
+                        else:
+                            st.info("Not paid", icon="💡")
                 else:
                     # Multiple entries selected - only allow delete operation
                     selected_ids = [entry['_id'] for entry in selected_entries]
@@ -2045,7 +2107,7 @@ def render_admin_dashboard():
                     
                     total_amount = sum(float(entry['Total (PLN)'].replace(' PLN', '')) for entry in selected_entries)
                     
-                    col1, col2 = st.columns([3, 1])
+                    col1, col2, col3 = st.columns([3, 1, 1])
                     
                     with col1:
                         st.write(f"**Selected {len(selected_entries)} entries** - Total: {total_amount:.2f} PLN")
@@ -2067,6 +2129,37 @@ def render_admin_dashboard():
                             st.session_state.admin_delete_entry_ids = selected_ids
                             st.session_state.admin_delete_data_list = selected_data_list
                             st.rerun()
+                    
+                    with col3:
+                        # Count paid entries in selection
+                        paid_entries = [entry for entry in selected_entries if 'Paid' in entry.get('Status', '')]
+                        
+                        if len(paid_entries) > 0:
+                            if st.button("⏪ Revert to Processing", key="revert_selected_btn", type="primary", use_container_width=True):
+                                # Get the IDs of paid entries only
+                                paid_entry_ids = [entry['_id'] for entry in paid_entries]
+                                
+                                # Revert paid entries to processing
+                                conn = sqlite3.connect(DB_NAME)
+                                cursor = conn.cursor()
+                                placeholders = ','.join(['?' for _ in paid_entry_ids])
+                                cursor.execute(f'''
+                                    UPDATE timesheet 
+                                    SET payment_status = 'processing' 
+                                    WHERE id IN ({placeholders})
+                                    AND COALESCE(payment_status, 'pending') = 'paid'
+                                ''', paid_entry_ids)
+                                updated_rows = cursor.rowcount
+                                conn.commit()
+                                conn.close()
+                                
+                                if updated_rows > 0:
+                                    st.session_state.admin_success_message = f"🔄 Reverted {updated_rows} paid entries back to processing"
+                                    st.rerun()
+                                else:
+                                    st.warning("No paid entries were found to revert")
+                        else:
+                            st.info("Select paid entries to revert", icon="💡")
                 
                 # Edit Entry Modal
                 if st.session_state.get('admin_edit_mode', False):
@@ -2332,38 +2425,64 @@ def render_admin_dashboard():
             # Payment Processing Actions
             st.markdown("---")
             st.subheader("💳 Payment Processing")
+            st.info("**Workflow:** Pending → Processing → Paid (entries must be marked as processing before being paid)")
             
-            if emp_pending_entries > 0:
-                # Get pending entries for selection
-                pending_entries = employee_data[employee_data['status'] == 'pending'].copy()
+            if emp_pending_entries > 0 or emp_processing_entries > 0:
+                # Get pending and processing entries for selection
+                unpaid_entries = employee_data[employee_data['status'].isin(['pending', 'processing'])].copy()
                 
                 # Payment method selection
                 payment_method = st.radio(
                     "Payment Method:",
-                    ["💳 Pay All Pending", "✅ Pay Selected Entries"],
+                    ["🔄 Mark All Pending as Processing", "💳 Pay All Processing Entries", "✅ Pay Selected Entries"],
                     horizontal=True,
-                    help="Choose to pay all pending entries at once or select specific entries"
+                    help="Workflow: Pending → Processing → Paid. Mark entries as processing first, then pay them."
                 )
                 
-                if payment_method == "💳 Pay All Pending":
-                    # Bulk payment option (existing functionality)
-                    col1, col2, col3 = st.columns([2, 2, 1])
+                if payment_method == "🔄 Mark All Pending as Processing":
+                    # Bulk processing option
+                    st.info(f"**Total Pending:** {emp_pending_amount:.2f} PLN ({emp_pending_entries} entries)")
                     
-                    with col1:
-                        st.info(f"**Total Pending:** {emp_pending_amount:.2f} PLN ({emp_pending_entries} entries)")
+                    if st.button(f"✅ Confirm: Mark All {emp_pending_entries} Pending Entries as Processing", key="mark_all_processing"):
+                        # Helper function to mark all pending entries as processing
+                        def mark_all_pending_as_processing(employee_name, start_date_str, end_date_str):
+                            """Mark all pending entries for an employee as processing"""
+                            conn = sqlite3.connect(DB_NAME)
+                            cursor = conn.cursor()
+                            cursor.execute('''
+                                UPDATE timesheet 
+                                SET payment_status = 'processing' 
+                                WHERE employee_name = ? 
+                                AND DATE(start_time) >= ? 
+                                AND DATE(start_time) <= ?
+                                AND COALESCE(payment_status, 'pending') = 'pending'
+                            ''', [employee_name, start_date_str, end_date_str])
+                            updated_rows = cursor.rowcount
+                            conn.commit()
+                            conn.close()
+                            return updated_rows
+                            
+                        updated_rows = mark_all_pending_as_processing(selected_employee, start_date_str, end_date_str)
+                        if updated_rows > 0:
+                            st.success(f"🔄 Marked {updated_rows} entries as processing for {selected_employee}")
+                            st.rerun()
+                        else:
+                            st.warning("No pending entries found to update")
+                
+                elif payment_method == "💳 Pay All Processing Entries":
+                    # Bulk payment option for processing entries only
+                    st.info(f"**Total Processing:** {emp_processing_amount:.2f} PLN ({emp_processing_entries} entries)")
+                    st.warning("⚠️ This will mark ALL PROCESSING entries as PAID")
                     
-                    with col2:
-                        st.warning("⚠️ This will mark ALL pending entries for this employee in this date range as PAID")
-                    
-                    with col3:
-                        if st.button(f"💳 Pay All ({emp_pending_amount:.2f} PLN)", type="primary", key="pay_all"):
-                            updated_rows = mark_date_range_as_paid(selected_employee, start_date_str, end_date_str)
-                            if updated_rows > 0:
-                                st.success(f"✅ Marked {updated_rows} entries as paid for {selected_employee}")
-                                st.balloons()
-                                st.rerun()
-                            else:
-                                st.warning("No pending entries found to update")
+                    # Pay all processing button
+                    if st.button(f"💳 Pay All Processing ({emp_processing_amount:.2f} PLN)", type="primary", key="pay_all_processing"):
+                        updated_rows = mark_date_range_as_paid(selected_employee, start_date_str, end_date_str)
+                        if updated_rows > 0:
+                            st.success(f"✅ Marked {updated_rows} processing entries as paid for {selected_employee}")
+                            st.balloons()
+                            st.rerun()
+                        else:
+                            st.warning("No processing entries found to update. Move pending entries to processing first.")
                 
                 else:
                     # Partial payment option using same table interface as admin section
@@ -2371,7 +2490,7 @@ def render_admin_dashboard():
                     
                     # Create selection data for payment processing (similar to admin section)
                     payment_selection_data = []
-                    for idx, row in pending_entries.iterrows():
+                    for idx, row in unpaid_entries.iterrows():
                         # Parse date
                         try:
                             parsed_date = pd.to_datetime(row['start_time'], format='mixed', errors='coerce')
@@ -2438,6 +2557,9 @@ def render_admin_dashboard():
                             "Duration/Amount": duration_str,
                             "Total (PLN)": f"{row['total_amount']:.2f}",
                             "Pet Names": pet_names_display,
+                            "Status": ('⏳ Pending' if row['status'] == 'pending' 
+                                     else '🔄 Processing' if row['status'] == 'processing' 
+                                     else '✅ Paid'),
                             "Description": description,
                             "_id": row['id'],
                             "_row_data": row
@@ -2455,7 +2577,7 @@ def render_admin_dashboard():
                             "_id": None,
                             "_row_data": None,
                         },
-                        disabled=["Date", "Job Type", "Start", "End", "Duration/Amount", "Total (PLN)", "Pet Names", "Description"],
+                        disabled=["Date", "Job Type", "Start", "End", "Duration/Amount", "Total (PLN)", "Pet Names", "Status", "Description"],
                         hide_index=True,
                         use_container_width=True,
                         key="payment_entry_selection"
@@ -2486,19 +2608,49 @@ def render_admin_dashboard():
                                 selected_amount += float(amount_str)
                         
                         st.markdown("---")
-                        col1, col2, col3 = st.columns([2, 2, 1])
+                        col1, col2, col3, col4, col5 = st.columns([2, 2, 1, 1, 1])
                         
                         with col1:
                             st.info(f"**Selected:** {selected_amount:.2f} PLN ({len(selected_entry_ids)} entries)")
                         
                         with col2:
-                            st.success(f"**Remaining Pending:** {emp_pending_amount - selected_amount:.2f} PLN")
+                            # Calculate remaining unpaid amount more accurately
+                            total_unpaid = emp_pending_amount + emp_processing_amount
+                            remaining_unpaid = total_unpaid - selected_amount
+                            st.success(f"**Remaining Unpaid:** {remaining_unpaid:.2f} PLN")
                         
                         with col3:
-                            if st.button(f"💳 Pay Selected ({selected_amount:.2f} PLN)", type="primary", key="pay_selected"):
-                                # Helper function to mark specific entries as paid
+                            if st.button(f"🔄 Mark Processing", key="mark_processing"):
+                                # Helper function to mark specific entries as processing
+                                def mark_selected_entries_as_processing(entry_ids):
+                                    """Mark specific entries as processing by their IDs"""
+                                    conn = sqlite3.connect(DB_NAME)
+                                    cursor = conn.cursor()
+                                    placeholders = ','.join(['?' for _ in entry_ids])
+                                    cursor.execute(f'''
+                                        UPDATE timesheet 
+                                        SET payment_status = 'processing' 
+                                        WHERE id IN ({placeholders})
+                                        AND COALESCE(payment_status, 'pending') = 'pending'
+                                    ''', entry_ids)
+                                    affected_rows = cursor.rowcount
+                                    conn.commit()
+                                    conn.close()
+                                    return affected_rows
+                                
+                                affected = mark_selected_entries_as_processing(selected_entry_ids)
+                                if affected > 0:
+                                    st.success(f"✅ Marked {affected} entries as processing!")
+                                    time.sleep(1)
+                                    st.rerun()
+                                else:
+                                    st.warning("No entries were updated. They may already be processed.")
+                        
+                        with col4:
+                            if st.button(f"💳 Mark Paid", type="primary", key="pay_selected"):
+                                # Helper function to mark specific entries as paid (only processing entries)
                                 def mark_selected_entries_as_paid(entry_ids):
-                                    """Mark specific entries as paid by their IDs"""
+                                    """Mark specific entries as paid by their IDs - only if they are processing"""
                                     conn = sqlite3.connect(DB_NAME)
                                     cursor = conn.cursor()
                                     placeholders = ','.join(['?' for _ in entry_ids])
@@ -2506,7 +2658,7 @@ def render_admin_dashboard():
                                         UPDATE timesheet 
                                         SET payment_status = 'paid' 
                                         WHERE id IN ({placeholders})
-                                        AND COALESCE(payment_status, 'pending') = 'pending'
+                                        AND COALESCE(payment_status, 'pending') = 'processing'
                                     ''', entry_ids)
                                     updated_rows = cursor.rowcount
                                     conn.commit()
@@ -2516,11 +2668,44 @@ def render_admin_dashboard():
                                 updated_rows = mark_selected_entries_as_paid(selected_entry_ids)
                                 if updated_rows > 0:
                                     # Store success message in session state for persistence
-                                    st.session_state.payment_success_message = f"✅ Marked {updated_rows} selected entries as paid ({selected_amount:.2f} PLN)"
+                                    st.session_state.payment_success_message = f"✅ Marked {updated_rows} selected processing entries as paid ({selected_amount:.2f} PLN)"
                                     st.balloons()
                                     st.rerun()
                                 else:
-                                    st.warning("No entries were updated")
+                                    # Check if there are pending entries that need to be processed first
+                                    pending_in_selection = any(row['_row_data'].get('payment_status', 'pending') == 'pending' 
+                                                             for row in selected_payment_entries 
+                                                             if hasattr(row.get('_row_data', {}), 'get') or isinstance(row.get('_row_data', {}), dict))
+                                    if pending_in_selection:
+                                        st.error("❌ Cannot mark pending entries as paid. Please mark them as processing first.")
+                                    else:
+                                        st.warning("No processing entries were found in selection to update")
+                        
+                        with col5:
+                            if st.button(f"⏪ Revert to Processing", key="revert_to_processing"):
+                                # Helper function to revert specific entries from paid back to processing
+                                def revert_selected_entries_to_processing(entry_ids):
+                                    """Revert specific entries from paid back to processing by their IDs"""
+                                    conn = sqlite3.connect(DB_NAME)
+                                    cursor = conn.cursor()
+                                    placeholders = ','.join(['?' for _ in entry_ids])
+                                    cursor.execute(f'''
+                                        UPDATE timesheet 
+                                        SET payment_status = 'processing' 
+                                        WHERE id IN ({placeholders})
+                                        AND COALESCE(payment_status, 'pending') = 'paid'
+                                    ''', entry_ids)
+                                    updated_rows = cursor.rowcount
+                                    conn.commit()
+                                    conn.close()
+                                    return updated_rows
+                                
+                                updated_rows = revert_selected_entries_to_processing(selected_entry_ids)
+                                if updated_rows > 0:
+                                    st.session_state.payment_success_message = f"🔄 Reverted {updated_rows} paid entries back to processing ({selected_amount:.2f} PLN)"
+                                    st.rerun()
+                                else:
+                                    st.warning("No paid entries were found in selection to revert")
                     else:
                         st.info("👆 Select entries above to process payment")
                     
@@ -2576,7 +2761,11 @@ def render_admin_dashboard():
         SELECT employee_name,
                COUNT(*) as total_entries,
                SUM(CASE WHEN COALESCE(payment_status, 'pending') = 'pending' THEN 1 ELSE 0 END) as pending_count,
-               SUM(CASE WHEN COALESCE(payment_status, 'pending') = 'pending' THEN total_amount ELSE 0 END) as pending_amount
+               SUM(CASE WHEN COALESCE(payment_status, 'pending') = 'pending' THEN total_amount ELSE 0 END) as pending_amount,
+               SUM(CASE WHEN COALESCE(payment_status, 'pending') = 'processing' THEN 1 ELSE 0 END) as processing_count,
+               SUM(CASE WHEN COALESCE(payment_status, 'pending') = 'processing' THEN total_amount ELSE 0 END) as processing_amount,
+               SUM(CASE WHEN COALESCE(payment_status, 'pending') IN ('pending', 'processing') THEN 1 ELSE 0 END) as unpaid_count,
+               SUM(CASE WHEN COALESCE(payment_status, 'pending') IN ('pending', 'processing') THEN total_amount ELSE 0 END) as unpaid_amount
         FROM timesheet 
         GROUP BY employee_name
         ORDER BY employee_name
@@ -2589,10 +2778,19 @@ def render_admin_dashboard():
     for _, row in global_status_df.iterrows():
         employee = row['employee_name']
         has_pending = row['pending_count'] > 0
+        has_processing = row['processing_count'] > 0
         pending_amount = row['pending_amount']
+        processing_amount = row['processing_amount']
+        unpaid_amount = row['unpaid_amount']
         
-        # Simple red/green status
-        if has_pending:
+        # Enhanced status with processing
+        if has_pending and has_processing:
+            status_color = "🟡 PENDING + PROCESSING"
+            status_style = "mixed"
+        elif has_processing:
+            status_color = "🔄 PROCESSING"
+            status_style = "processing"
+        elif has_pending:
             status_color = "🔴 PENDING"
             status_style = "pending"
         else:
@@ -2603,7 +2801,7 @@ def render_admin_dashboard():
             'Employee': employee,
             'Payment Status': status_color,
             'Total Entries': row['total_entries'],
-            'Pending Amount (PLN)': f"{pending_amount:.2f}" if pending_amount > 0 else "-"
+            'Unpaid Amount (PLN)': f"{unpaid_amount:.2f}" if unpaid_amount > 0 else "-"
         })
     
     # Display simple status table
@@ -2616,7 +2814,9 @@ def render_admin_dashboard():
         paid_employees = len([emp for emp in status_table if '🟢' in emp['Payment Status']])
         pending_employees = total_employees - paid_employees
         
-        # Calculate total pending amount across all employees
+        # Calculate total unpaid amount across all employees
+        total_unpaid_amount = global_status_df['unpaid_amount'].sum()
+        total_processing_amount = global_status_df['processing_amount'].sum()
         total_pending_amount = global_status_df['pending_amount'].sum()
         
         col1, col2, col3, col4 = st.columns(4)
@@ -2625,9 +2825,13 @@ def render_admin_dashboard():
         with col2:
             st.metric("🟢 Fully Paid", paid_employees)
         with col3:
-            st.metric("🔴 Have Pending", pending_employees)
+            st.metric("🔴 Have Unpaid", pending_employees)
         with col4:
-            st.metric("💰 Total Pending", f"{total_pending_amount:.2f} PLN")
+            st.metric("💰 Total Unpaid", f"{total_unpaid_amount:.2f} PLN")
+            
+        # Additional processing info if any
+        if total_processing_amount > 0:
+            st.info(f"🔄 Currently Processing: {total_processing_amount:.2f} PLN")
 
 def render_employee_management():
     """Employee management interface for administrators"""
@@ -3617,11 +3821,11 @@ def render_employee_reports(current_user):
         st.write("**Custom Date Range:**")
         col1, col2 = st.columns(2)
         with col1:
-            start_date_input = st.date_input("Start Date", value=st.session_state.emp_reports_start_date, key="emp_reports_start_date")
+            start_date_input = st.date_input("Start Date", key="emp_reports_start_date")
             if start_date_input != st.session_state.emp_reports_start_date:
                 st.session_state.emp_reports_start_date = start_date_input
         with col2:
-            end_date_input = st.date_input("End Date", value=st.session_state.emp_reports_end_date, key="emp_reports_end_date")
+            end_date_input = st.date_input("End Date", key="emp_reports_end_date")
             if end_date_input != st.session_state.emp_reports_end_date:
                 st.session_state.emp_reports_end_date = end_date_input
         
@@ -3866,7 +4070,7 @@ def generate_employee_personal_report(conn, current_user, start_date, end_date):
     # 2. SUMMARY METRICS 
     st.markdown("### 📊 Your Summary")
     
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         total_earnings = df['total_amount'].sum()
@@ -3874,13 +4078,27 @@ def generate_employee_personal_report(conn, current_user, start_date, end_date):
     
     with col2:
         paid_amount = df[df['payment_status'] == 'paid']['total_amount'].sum()
-        st.metric("Amount Paid", f"{paid_amount:.2f} PLN", 
-                 delta=f"{total_earnings - paid_amount:.2f} PLN pending")
+        st.metric("Amount Paid", f"{paid_amount:.2f} PLN")
     
     with col3:
+        processing_amount = df[df['payment_status'] == 'processing']['total_amount'].sum()
+        st.metric("Amount Processing", f"{processing_amount:.2f} PLN")
+    
+    with col4:
+        pending_amount = df[df['payment_status'] == 'pending']['total_amount'].sum()
+        st.metric("Amount Pending", f"{pending_amount:.2f} PLN")
+    
+    # Additional metrics
+    col1, col2, col3 = st.columns([1, 1, 2])
+    with col1:
         total_entries = len(df)
         st.metric("Total Entries", total_entries)
-    
+    with col2:
+        paid_entries = len(df[df['payment_status'] == 'paid'])
+        processing_entries = len(df[df['payment_status'] == 'processing'])
+        pending_entries = len(df[df['payment_status'] == 'pending'])
+        st.metric("Entry Status", f"✅{paid_entries} 🔄{processing_entries} ⏳{pending_entries}")
+
     # 3. JOB TYPE BREAKDOWN
     st.markdown("### 🏢 Your Job Type Breakdown")
     
@@ -3941,6 +4159,222 @@ def generate_employee_personal_report(conn, current_user, start_date, end_date):
         use_container_width=True
     )
 
+def render_manage_records(current_user):
+    """Render the employee record management page"""
+    st.title("🗑️ Manage Your Records")
+    st.info("**Note:** You can only delete records that are still **Pending**. Once an admin moves them to Processing, they cannot be deleted.")
+    
+    # Enhanced Date Range Selection for Record Management
+    st.subheader("📅 Select Date Range")
+    
+    # Helper function to get Friday-to-Thursday week range
+    def get_friday_week_range(target_date):
+        """Get the Friday-to-Thursday week containing the target date"""
+        days_from_friday = (target_date.weekday() + 3) % 7  # 0=Friday, 1=Saturday, ..., 6=Thursday
+        week_start = target_date - timedelta(days=days_from_friday)  # Friday
+        week_end = week_start + timedelta(days=6)  # Thursday
+        return week_start, week_end
+    
+    # Get current date and default ranges
+    today = datetime.now().date()
+    
+    # Initialize session state for dates if not exists
+    if 'manage_start_date' not in st.session_state:
+        st.session_state.manage_start_date = (datetime.now() - timedelta(days=30)).date()
+    if 'manage_end_date' not in st.session_state:
+        st.session_state.manage_end_date = datetime.now().date()
+    
+    # Quick preset buttons
+    st.write("**Quick Presets:**")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    with col1:
+        if st.button("📍 Current Week (Fri-Thu)", help="Current Friday to Thursday week", key="manage_current_week"):
+            current_week_start, current_week_end = get_friday_week_range(today)
+            st.session_state.manage_start_date = current_week_start
+            st.session_state.manage_end_date = current_week_end
+    
+    with col2:
+        if st.button("⬅️ Last Week", help="Previous Friday to Thursday week", key="manage_last_week"):
+            last_week_target = today - timedelta(days=7)
+            last_week_start, last_week_end = get_friday_week_range(last_week_target)
+            st.session_state.manage_start_date = last_week_start
+            st.session_state.manage_end_date = last_week_end
+    
+    with col3:
+        if st.button("📅 Current Month", help="From 1st to last day of current month", key="manage_current_month"):
+            month_start = today.replace(day=1)
+            next_month = month_start.replace(month=month_start.month % 12 + 1) if month_start.month < 12 else month_start.replace(year=month_start.year + 1, month=1)
+            month_end = next_month - timedelta(days=1)
+            st.session_state.manage_start_date = month_start
+            st.session_state.manage_end_date = month_end
+    
+    with col4:
+        if st.button("⬅️ Last Month", help="Previous month", key="manage_last_month"):
+            if today.month == 1:
+                last_month_start = today.replace(year=today.year - 1, month=12, day=1)
+            else:
+                last_month_start = today.replace(month=today.month - 1, day=1)
+            
+            # Get last day of previous month
+            this_month_start = today.replace(day=1)
+            last_month_end = this_month_start - timedelta(days=1)
+            
+            st.session_state.manage_start_date = last_month_start
+            st.session_state.manage_end_date = last_month_end
+    
+    with col5:
+        if st.button("📊 Last 30 Days", help="Past 30 days", key="manage_last_30"):
+            st.session_state.manage_start_date = today - timedelta(days=30)
+            st.session_state.manage_end_date = today
+    
+    with col4:
+        if st.button("🗓️ This Month", help="Current month", key="manage_this_month"):
+            month_start = today.replace(day=1)
+            st.session_state.manage_start_date = month_start
+            st.session_state.manage_end_date = today
+    
+    # Custom date range inputs
+    st.write("**Custom Date Range:**")
+    col1, col2 = st.columns(2)
+    with col1:
+        start_date_input = st.date_input("Start Date", value=st.session_state.manage_start_date, key="manage_start_date")
+        if start_date_input != st.session_state.manage_start_date:
+            st.session_state.manage_start_date = start_date_input
+    with col2:
+        end_date_input = st.date_input("End Date", value=st.session_state.manage_end_date, key="manage_end_date")
+        if end_date_input != st.session_state.manage_end_date:
+            st.session_state.manage_end_date = end_date_input
+    
+    # Use session state values
+    start_date = st.session_state.manage_start_date
+    end_date = st.session_state.manage_end_date
+    
+    # Initialize database connection
+    conn = sqlite3.connect(DB_NAME)
+    
+    # Get only pending records for this employee
+    pending_records_query = """
+        SELECT 
+            id,
+            start_time,
+            end_time,
+            job_type,
+            total_amount,
+            description,
+            pet_names,
+            COALESCE(payment_status, 'pending') as payment_status
+        FROM timesheet 
+        WHERE employee_name = ? 
+        AND COALESCE(payment_status, 'pending') = 'pending'
+        AND date(start_time) BETWEEN ? AND ?
+        ORDER BY start_time DESC
+    """
+    
+    pending_df = pd.read_sql_query(pending_records_query, conn, params=[current_user['name'], start_date, end_date])
+    
+    if len(pending_df) > 0:
+        st.write(f"**You have {len(pending_df)} pending record(s) that can be deleted:**")
+        st.info("💡 **Tip:** Check the boxes next to records you want to delete, then use the delete button below the table.")
+        
+        # Create selection data for deletion
+        delete_selection_data = []
+        for idx, row in pending_df.iterrows():
+            # Parse start time
+            try:
+                parsed_start = pd.to_datetime(row['start_time'], format='mixed', errors='coerce')
+                date_str = parsed_start.strftime('%d-%b-%y') if not pd.isna(parsed_start) else 'Invalid'
+                start_time_str = parsed_start.strftime('%H:%M') if not pd.isna(parsed_start) else 'Invalid'
+            except:
+                date_str = 'Invalid'
+                start_time_str = 'Invalid'
+            
+            # Parse end time
+            try:
+                parsed_end = pd.to_datetime(row['end_time'], format='mixed', errors='coerce')
+                end_time_str = parsed_end.strftime('%H:%M') if not pd.isna(parsed_end) else 'Invalid'
+            except:
+                end_time_str = 'Invalid'
+            
+            # Get job type display name
+            job_display = JOB_TYPES_DISPLAY.get(row['job_type'], row['job_type'])
+            
+            # Handle pet names
+            try:
+                pet_names = json.loads(row['pet_names']) if row['pet_names'] else []
+                pet_names_str = ", ".join(pet_names) if pet_names else ""
+            except:
+                pet_names_str = str(row['pet_names']) if not pd.isna(row['pet_names']) else ""
+            
+            delete_selection_data.append({
+                "Select": False,
+                "Date": date_str,
+                "Start": start_time_str,
+                "End": end_time_str,
+                "Job Type": job_display,
+                "Amount (PLN)": f"{row['total_amount']:.2f}",
+                "Pet Names": pet_names_str[:20] + "..." if len(pet_names_str) > 20 else pet_names_str,
+                "Description": (str(row['description'])[:30] + "...") if row['description'] and len(str(row['description'])) > 30 else str(row['description']) if row['description'] else "",
+                "_id": row['id']
+            })
+        
+        # Display selection table
+        edited_delete_data = st.data_editor(
+            delete_selection_data,
+            column_config={
+                "Select": st.column_config.CheckboxColumn(
+                    "Select",
+                    help="Select records to delete",
+                    default=False,
+                ),
+                "_id": None,
+            },
+            disabled=["Date", "Start", "End", "Job Type", "Amount (PLN)", "Pet Names", "Description"],
+            hide_index=True,
+            use_container_width=True,
+            key="employee_delete_selection"
+        )
+        
+        # Find selected entries for deletion - use the edited data directly
+        selected_for_deletion = [row for row in edited_delete_data if row.get('Select', False)]
+        
+        # Always show the action section, even if no selections yet
+        st.markdown("---")
+        if len(selected_for_deletion) > 0:
+            selected_ids = [row['_id'] for row in selected_for_deletion]
+            selected_amount = sum(float(row['Amount (PLN)']) for row in selected_for_deletion)
+            
+            st.warning(f"⚠️ **You are about to delete {len(selected_for_deletion)} record(s) totaling {selected_amount:.2f} PLN**")
+            
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.error("**This action cannot be undone!** Make sure these records contain errors before deleting.")
+            with col2:
+                if st.button(f"🗑️ Delete {len(selected_for_deletion)} Record(s)", type="primary", key="employee_delete_confirm"):
+                    try:
+                        # Delete the selected records
+                        placeholders = ','.join(['?' for _ in selected_ids])
+                        cursor = conn.cursor()
+                        cursor.execute(f'DELETE FROM timesheet WHERE id IN ({placeholders})', selected_ids)
+                        conn.commit()
+                        
+                        success_msg = f"✅ Successfully deleted {len(selected_for_deletion)} record(s)!"
+                        st.success(success_msg)
+                        st.balloons()
+                        
+                        # Refresh the page after a short delay
+                        time.sleep(1)
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error deleting records: {str(e)}")
+        else:
+            st.info("👆 Select pending records above to delete them.")
+    else:
+        st.success("✅ You have no pending records in this date range that can be deleted.")
+    
+    conn.close()
+
 def render_data_export():
     """Data Export functionality"""
     st.title("📁 Data Export")
@@ -3953,13 +4387,19 @@ def render_data_export():
         st.info("""
         **Payment Status Filter Options:**
         - **All Records**: Export all timesheet entries regardless of payment status
-        - **Pending Payments Only**: Export only entries that haven't been paid yet
-        - **Paid Records Only**: Export only entries that have been marked as paid
+        - **Pending Records Only**: Export only entries that are pending approval
+        - **Processing Records Only**: Export only entries that are currently being processed for payment
+        - **Paid Records Only**: Export only entries that have been completed and paid
+        
+        **Three-Stage Payment Workflow:**
+        1. **Pending** → Newly submitted entries awaiting review
+        2. **Processing** → Entries approved and being prepared for payment
+        3. **Paid** → Entries that have been completed and paid
         
         This feature is useful for:
-        - Generating payroll reports for pending payments
-        - Tracking which employees need to be paid
-        - Maintaining payment history records
+        - Generating payroll reports for different payment stages
+        - Tracking payment workflow progress
+        - Maintaining comprehensive payment history records
         """)
     
     col1, col2 = st.columns(2)
@@ -3967,9 +4407,9 @@ def render_data_export():
     with col1:
         export_type = st.radio("Export Type:", ["Current Week", "All Data", "Custom Date Range"])
         
-        # Payment status filter
+        # Payment status filter - updated for three-stage workflow
         payment_filter = st.radio("Payment Status Filter:", 
-                                ["All Records", "Pending Payments Only", "Paid Records Only"])
+                                ["All Records", "Pending Records Only", "Processing Records Only", "Paid Records Only"])
     
     with col2:
         if export_type == "Custom Date Range":
@@ -3978,8 +4418,10 @@ def render_data_export():
     
     # Get data based on selection
     payment_status_filter = None
-    if payment_filter == "Pending Payments Only":
+    if payment_filter == "Pending Records Only":
         payment_status_filter = "pending"
+    elif payment_filter == "Processing Records Only":
+        payment_status_filter = "processing"
     elif payment_filter == "Paid Records Only":
         payment_status_filter = "paid"
     
@@ -4074,14 +4516,19 @@ def render_data_export():
         # Payment status summary
         if 'Payment Status' in export_df.columns:
             pending_count = len(export_df[export_df['Payment Status'] == 'pending'])
+            processing_count = len(export_df[export_df['Payment Status'] == 'processing'])
             paid_count = len(export_df[export_df['Payment Status'] == 'paid'])
+            
             pending_amount = export_df[export_df['Payment Status'] == 'pending'][TOTAL_AMOUNT_PLN].sum()
+            processing_amount = export_df[export_df['Payment Status'] == 'processing'][TOTAL_AMOUNT_PLN].sum()
             paid_amount = export_df[export_df['Payment Status'] == 'paid'][TOTAL_AMOUNT_PLN].sum()
             
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             with col1:
                 st.write(f"**🟡 Pending:** {pending_count} entries ({pending_amount:.2f} PLN)")
             with col2:
+                st.write(f"**🔄 Processing:** {processing_count} entries ({processing_amount:.2f} PLN)")
+            with col3:
                 st.write(f"**🟢 Paid:** {paid_count} entries ({paid_amount:.2f} PLN)")
         
         # Convert to Excel
