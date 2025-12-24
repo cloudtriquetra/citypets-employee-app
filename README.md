@@ -25,6 +25,7 @@ A comprehensive Streamlit-based timesheet management system designed for pet car
 - Excel export functionality
 - Employee performance analytics
 - Interactive charts and visualizations
+- Holiday rate management with date-based automatic rate switching
 
 ### 📱 **Mobile-Optimized**
 - Responsive design for mobile devices
@@ -137,10 +138,17 @@ Configure individual employee rates for different job types:
     "management": 30,
     "transport": 25,
     "transport_km": 2.5,
-    "expense": 0
+    "expense": 0,
+    "holiday_rate_hotel": 30,
+    "holiday_rate_overnight_hotel": 100
   }
 }
 ```
+
+**Holiday Rates**: Special rates automatically applied on designated holiday dates:
+- `holiday_rate_hotel`: Hourly rate for hotel/daycare on holidays (typically base hotel rate + 5)
+- `holiday_rate_overnight_hotel`: Fixed rate for overnight hotel shifts on holidays (typically 100 PLN)
+- Holiday rates only apply to **hotel** and **overnight_hotel** job types (not walk or pet sitting)
 
 ### Job Access Control (`job_type_restrictions.json`)
 
@@ -187,7 +195,8 @@ citypets-employee-app/
 ├── citypets_users.db                # SQLite database for user management
 ├── employees_config.json            # Actual employee configuration
 ├── pet_custom_rates.json            # Actual pet rates
-└── job_type_restrictions.json       # Actual job restrictions
+├── job_type_restrictions.json       # Actual job restrictions
+└── holiday_dates.json               # Designated holiday dates for special rates
 ```
 
 ## 🛡️ Security Features
@@ -239,7 +248,8 @@ Once logged in, you'll see different menu options based on your role:
 - 📊 Reports (Comprehensive Analytics)
 - 📁 Data Export
 - 👥 Employee Management (Rates & Job Access)
-- 🔐 User Management (Account Creation)
+- �️ Holiday Management (Holiday Dates & Rates)
+- �🔐 User Management (Account Creation)
 
 ## 🔐 Security Features
 
@@ -263,7 +273,65 @@ Once logged in, you'll see different menu options based on your role:
 2. **🥈 Employee-Specific Rates** (Medium Priority) - Individual employee rates
 3. **🥉 Standard Base Rates** (Lowest Priority) - Default fallback rates
 
-## 🚀 Deployment
+## �️ Holiday Rate Management
+
+### Overview
+The application supports automatic rate switching for designated holiday dates. When employees submit timesheets for work performed on holidays, the system automatically applies higher holiday rates instead of standard rates.
+
+### Admin Features
+**Holiday Management** page (Admin access only) provides two key functions:
+
+#### 1. Holiday Dates Management
+- **Add Holiday Dates**: Use the date picker to select and add special dates (e.g., Christmas, New Year)
+- **Remove Dates**: Delete holiday dates that are no longer needed
+- **View All Dates**: See a complete list of designated holiday dates
+- **Persistence**: Holiday dates are stored in `holiday_dates.json` and persist across application restarts
+
+#### 2. Holiday Rates Configuration
+- **Visual Comparison Table**: See standard rates vs. holiday rates side-by-side for all employees
+- **Individual Rate Editing**: Update holiday rates for specific employees
+- **Real-time Updates**: Changes apply immediately to new timesheet entries
+
+### Automatic Rate Application
+**How it works:**
+1. Employee submits timesheet for work on a designated holiday date
+2. System checks if the date is in the holiday dates list
+3. If yes, automatically uses `holiday_rate_hotel` or `holiday_rate_overnight_hotel`
+4. If no, uses standard `hotel` or `overnight_hotel` rates
+
+**Job Types with Holiday Rates:**
+- ✅ **Hotel/Daycare** → Uses `holiday_rate_hotel` on holidays
+- ✅ **Overnight Hotel** → Uses `holiday_rate_overnight_hotel` on holidays
+- ❌ **Walk** → No holiday rate (uses standard rate)
+- ❌ **Pet Sitting** → No holiday rate (uses standard rate)
+- ❌ **Other job types** → No holiday rates
+
+### Rate Calculation Rules
+- **Holiday Hotel Rate**: Typically base hotel rate + 5 PLN (e.g., 25 → 30)
+- **Holiday Overnight Rate**: Typically fixed at 100 PLN (regardless of base rate)
+- **Configurable**: Admins can set any value for holiday rates per employee
+
+### Configuration File: `holiday_dates.json`
+```json
+{
+  "holiday_dates": [
+    "2025-12-25",
+    "2026-01-01",
+    "2025-12-24",
+    "2025-12-26"
+  ]
+}
+```
+
+**Format**: Dates must be in `YYYY-MM-DD` format
+
+### Best Practices
+1. **Plan Ahead**: Add holiday dates at the beginning of the year
+2. **Consistent Rates**: Keep holiday rate premiums consistent across similar roles
+3. **Communication**: Inform employees about holiday rate policies
+4. **Regular Review**: Update holiday dates annually for new year
+
+## �🚀 Deployment
 
 ### Local Deployment (Tested & Recommended)
 - Perfect for small teams and local use
