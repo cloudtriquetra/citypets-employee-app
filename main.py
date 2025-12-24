@@ -27,7 +27,8 @@ from employee_config import (
     get_all_employee_data, clone_employee_rates,
     add_job_type_restriction, remove_job_type_restriction,
     get_job_type_restrictions, list_restricted_job_types,
-    get_employees_allowed_for_job_type
+    get_employees_allowed_for_job_type,
+    add_holiday_date, remove_holiday_date, is_holiday, get_all_holiday_dates
 )
 
 # Import new authentication system
@@ -71,6 +72,7 @@ JOB_TYPES_DISPLAY = {
     "transport": "Transport",
     "transport_km": "Transport KM",
     "training": "Training",
+    "household_work": "Household Work",
     "expense": "Expense",
     "night_shift": "Night Shift",
     # Legacy mappings for backward compatibility
@@ -365,25 +367,35 @@ def initialize_database():
 # Calculate work duration and payment amount
 def calculate_work_duration_and_amount(start_time, end_time, job_type, employee_name, quantity=1, pet_names=None):
     """Calculate work duration and payment amount"""
+    # Extract date from start_time for holiday rate checking
+    date_str = None
+    if start_time:
+        try:
+            start_dt = datetime.fromisoformat(start_time)
+            date_str = start_dt.strftime('%Y-%m-%d')
+        except Exception as e:
+            print(f"Error extracting date from start_time {start_time}: {e}")
+            pass
+    
     # Handle expenses (quantity = amount in PLN)
     if job_type == "expense":
         return quantity, quantity  # Return amount as both duration and total amount
     
     # Handle KM-based transport (quantity = kilometers)
     if job_type in ["transport_km"]:
-        rate = get_employee_rate(employee_name, job_type, pet_names)
+        rate = get_employee_rate(employee_name, job_type, pet_names, date_str)
         total_amount = quantity * rate
         return quantity, total_amount  # Return KM and total amount
     
     # Handle cat visits (count-based, no duration needed)
     if job_type == "cat_visit":
-        rate = get_employee_rate(employee_name, job_type, pet_names)
+        rate = get_employee_rate(employee_name, job_type, pet_names, date_str)
         total_amount = quantity * rate
         return quantity, total_amount  # Return visit count and total amount
     
     # Handle overnight jobs (flat rate)
     if job_type in ["overnight_hotel", "night_shift", "overnight_pet_sitting", "holiday_on"]:
-        rate = get_employee_rate(employee_name, job_type, pet_names)
+        rate = get_employee_rate(employee_name, job_type, pet_names, date_str)
         if job_type in ["overnight_hotel", "night_shift"]:
             return 12.0, rate  # 12 hours for overnight hotel
         else:
@@ -396,7 +408,7 @@ def calculate_work_duration_and_amount(start_time, end_time, job_type, employee_
         end = datetime.fromisoformat(end_time)
         days = max(1, (end.date() - start.date()).days)  # Minimum 1 day, no +1 for overnight counting
         
-        rate = get_employee_rate(employee_name, job_type, pet_names)
+        rate = get_employee_rate(employee_name, job_type, pet_names, date_str)
         total_amount = days * rate
         return days, total_amount  # Return days and total amount
     
@@ -404,7 +416,7 @@ def calculate_work_duration_and_amount(start_time, end_time, job_type, employee_
     if job_type == "walk":
         if not end_time or end_time == start_time:
             # Default to 1 hour for walks when no duration specified
-            rate = get_employee_rate(employee_name, job_type, pet_names)
+            rate = get_employee_rate(employee_name, job_type, pet_names, date_str)
             total_amount = 1.0 * rate
             return 1.0, total_amount
     
@@ -413,7 +425,7 @@ def calculate_work_duration_and_amount(start_time, end_time, job_type, employee_
     end = datetime.fromisoformat(end_time)
     duration = (end - start).total_seconds() / 3600  # Convert to hours
     
-    rate = get_employee_rate(employee_name, job_type, pet_names)
+    rate = get_employee_rate(employee_name, job_type, pet_names, date_str)
     total_amount = duration * rate
     
     return duration, total_amount
@@ -429,8 +441,17 @@ def save_timesheet_entry(data):
         quantity = data.get('quantity', 1)
         pet_names = data.get('pet_names', [])
         
-        # Pre-calculate employee rate once to avoid multiple calls
-        employee_rate = get_employee_rate(data['employee_name'], data['job_type'], pet_names)
+        # Extract date for holiday rate checking
+        date_str = None
+        if data.get('start_time'):
+            try:
+                start_dt = datetime.fromisoformat(data['start_time'])
+                date_str = start_dt.strftime('%Y-%m-%d')
+            except Exception as e:
+                print(f"Error extracting date from start_time: {e}")
+        
+        # Pre-calculate employee rate once to avoid multiple calls (now with date for holiday rates)
+        employee_rate = get_employee_rate(data['employee_name'], data['job_type'], pet_names, date_str)
         
         # Calculate duration and amount based on job type
         if data['job_type'] in ["transport_km"]:
@@ -731,6 +752,7 @@ def render_main_application():
             "📝 Employee Timesheet Form", 
             "💳 Admin Dashboard", 
             "👥 Employee Management",
+            "🎄 Holiday Management",
             "📊 Reports",
             "📁 Data Export",
             "🔐 User Management"
@@ -754,6 +776,9 @@ def render_main_application():
     elif page == "👥 Employee Management":
         EnhancedAuthManager.require_admin()  # Ensure admin access
         render_employee_management()
+    elif page == "🎄 Holiday Management":
+        EnhancedAuthManager.require_admin()  # Ensure admin access
+        render_holiday_management()
     elif page == "📊 Reports":
         EnhancedAuthManager.require_admin()  # Ensure admin access
         render_reports_page()
@@ -3101,6 +3126,173 @@ def render_employee_management():
     import pandas as pd
     df = pd.DataFrame(access_matrix)
     st.dataframe(df, use_container_width=True)
+
+def render_holiday_management():
+    """Holiday dates and rates management for administrators"""
+    st.title("🎄 Holiday Management")
+    
+    st.write("Manage holiday dates and holiday rates for employees. When a timesheet entry falls on a designated holiday date, the system will automatically use holiday rates instead of regular rates.")
+    
+    # Create tabs for managing holidays and rates
+    tab1, tab2 = st.tabs(["📅 Holiday Dates", "💰 Holiday Rates"])
+    
+    with tab1:
+        st.subheader("📅 Manage Holiday Dates")
+        
+        # Show existing holiday dates
+        holiday_dates = get_all_holiday_dates()
+        
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            st.write(f"**Current Holiday Dates ({len(holiday_dates)}):**")
+            if holiday_dates:
+                # Sort dates and display
+                sorted_dates = sorted(holiday_dates)
+                for date_str in sorted_dates:
+                    date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    formatted_date = date_obj.strftime('%B %d, %Y (%A)')
+                    st.info(f"🎄 {formatted_date}")
+            else:
+                st.warning("No holiday dates configured yet.")
+        
+        with col2:
+            st.write("**Quick Actions**")
+            if st.button("🎄 Add Christmas 2025", key="add_christmas"):
+                add_holiday_date("2025-12-25")
+                st.success("Added Christmas!")
+                st.rerun()
+            
+            if st.button("🎆 Add New Year 2026", key="add_newyear"):
+                add_holiday_date("2026-01-01")
+                st.success("Added New Year!")
+                st.rerun()
+        
+        st.markdown("---")
+        
+        # Add new holiday date
+        st.subheader("➕ Add Holiday Date")
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            new_holiday_date = st.date_input(
+                "Select Date:", 
+                value=datetime.now().date(),
+                help="Choose a date to mark as a holiday"
+            )
+        
+        with col2:
+            if st.button("➕ Add Date", type="primary"):
+                date_str = new_holiday_date.strftime('%Y-%m-%d')
+                if add_holiday_date(date_str):
+                    st.success(f"✅ Added {new_holiday_date.strftime('%B %d, %Y')} as a holiday!")
+                    st.rerun()
+                else:
+                    st.warning("This date is already marked as a holiday.")
+        
+        st.markdown("---")
+        
+        # Remove holiday date
+        if holiday_dates:
+            st.subheader("➖ Remove Holiday Date")
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                # Create display options with formatted dates
+                date_options = {}
+                for date_str in sorted(holiday_dates):
+                    date_obj = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    formatted = date_obj.strftime('%B %d, %Y (%A)')
+                    date_options[formatted] = date_str
+                
+                selected_display = st.selectbox(
+                    "Select Date to Remove:",
+                    options=list(date_options.keys()),
+                    key="remove_holiday_select"
+                )
+            
+            with col2:
+                if st.button("❌ Remove", type="secondary"):
+                    date_to_remove = date_options[selected_display]
+                    if remove_holiday_date(date_to_remove):
+                        st.success(f"✅ Removed {selected_display}")
+                        st.rerun()
+                    else:
+                        st.error("Error removing date.")
+    
+    with tab2:
+        st.subheader("💰 Manage Holiday Rates")
+        
+        st.info("💡 Holiday rates are applied automatically when timesheet entries are created on designated holiday dates.")
+        
+        # Select employee
+        selected_employee = st.selectbox(
+            "Select Employee:",
+            list_employees(),
+            key="holiday_rate_employee"
+        )
+        
+        if selected_employee:
+            employee_data = get_all_employee_data()[selected_employee]['rates']
+            
+            # Show current rates vs holiday rates
+            st.markdown("### Current Rates Comparison")
+            
+            # Define the job types that have holiday rates
+            holiday_job_types = {
+                "hotel": "Hotel (Hourly)",
+                "overnight_hotel": "Overnight Hotel"
+            }
+            
+            # Create comparison table
+            comparison_data = []
+            for job_type, display_name in holiday_job_types.items():
+                regular_rate = employee_data.get(job_type, "N/A")
+                holiday_rate_key = f"holiday_rate_{job_type}"
+                holiday_rate = employee_data.get(holiday_rate_key, "N/A")
+                
+                comparison_data.append({
+                    "Job Type": display_name,
+                    "Regular Rate (PLN)": regular_rate if regular_rate != "N/A" else "-",
+                    "Holiday Rate (PLN)": holiday_rate if holiday_rate != "N/A" else "-"
+                })
+            
+            df = pd.DataFrame(comparison_data)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            
+            st.markdown("---")
+            
+            # Edit holiday rates
+            st.markdown("### Edit Holiday Rates")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                new_hotel_holiday = st.number_input(
+                    "Hotel Holiday Rate:",
+                    min_value=0.0,
+                    value=float(employee_data.get("holiday_rate_hotel", 30.0)),
+                    step=1.0,
+                    key=f"hotel_holiday_{selected_employee}"
+                )
+            
+            with col2:
+                new_overnight_holiday = st.number_input(
+                    "Overnight Holiday Rate:",
+                    min_value=0.0,
+                    value=float(employee_data.get("holiday_rate_overnight_hotel", 100.0)),
+                    step=1.0,
+                    key=f"overnight_holiday_{selected_employee}"
+                )
+            
+            if st.button("💾 Save Holiday Rates", type="primary"):
+                try:
+                    update_employee_base_rate(selected_employee, "holiday_rate_hotel", new_hotel_holiday)
+                    update_employee_base_rate(selected_employee, "holiday_rate_overnight_hotel", new_overnight_holiday)
+                    st.success(f"✅ Updated holiday rates for {selected_employee}!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error updating rates: {e}")
 
 def render_reports_page():
     """Comprehensive reports page for administrators"""

@@ -13,6 +13,12 @@ EMPLOYEES_FILE = "employees_config.json"
 # File to persist pet custom rates
 PET_RATES_FILE = "pet_custom_rates.json"
 
+# File to persist holiday dates
+HOLIDAY_DATES_FILE = "holiday_dates.json"
+
+# Holiday dates storage
+HOLIDAY_DATES = []
+
 # Pet-specific custom rates that apply to ALL employees
 # Format: "pet_name": {"job_type": custom_rate}
 # Note: These are now loaded from pet_custom_rates.json file
@@ -105,25 +111,202 @@ JOB_TYPES = {
     "training": {
         "name": "Training (Hours)",
         "description": "Training sessions - hourly rate"
+    },
+    "household_work": {
+        "name": "Household Work (Hours)",
+        "description": "Household work tasks - hourly rate"
     }
     # Note: Holiday rates are applied automatically by admin for specific dates
-    # They modify existing job types (hotel, walk, overnight) rather than being separate job types
+    # They modify hotel and overnight job types (not walk) with higher rates
 }
 
 # Employee configurations - each employee has their own defined rates
-# Employee rates are now loaded from employees_config.json file
-# This fallback dict only provides default rate structure for new employees
 EMPLOYEES = {
-    # Real employee data is loaded from employees_config.json at startup
-    # This dict serves as fallback/template for new employee creation
+    "ROXANA": {
+        "hotel": 25,
+        "walk": 25,
+        "overnight_hotel": 90,
+        "cat_visit": 30,
+        "pet_sitting_hourly": 17,
+        "overnight_pet_sitting": 140,
+        "dog_at_home": 75,
+        "cat_at_home": 25,
+        # Holiday rates - applied automatically by admin on designated dates
+        "holiday_rate_hotel": 30,      # Holiday rate for hotel work
+        "holiday_rate_overnight_hotel_hotel": 100  # Holiday rate for overnight work (both hotel and pet sitting)
+    },
+    "JEAN": {
+        "hotel": 25,
+        "walk": 25,
+        "overnight_hotel": 90,
+        "cat_visit": 30,
+        "pet_sitting_hourly": 17,
+        "overnight_pet_sitting": 140,
+        "dog_at_home": 75,
+        "cat_at_home": 25,
+        "holiday_rate_hotel": 30,
+        "holiday_rate_walk": 30,
+        "holiday_rate_overnight_hotel_hotel": 100
+    },
+    "SURIYA": {
+        "hotel": 25,
+        "walk": 25,
+        "overnight_hotel": 90,
+        "cat_visit": 30,
+        "pet_sitting_hourly": 17,
+        "overnight_pet_sitting": 140,
+        "dog_at_home": 75,
+        "cat_at_home": 25,
+        "holiday_rate_hotel": 30,
+        "holiday_rate_walk": 30,
+        "holiday_rate_overnight_hotel_hotel": 100
+    },
+    "KUBA": {
+        "hotel": 25,
+        "walk": 25,
+        "overnight_hotel": 90,
+        "cat_visit": 30,
+        "pet_sitting_hourly": 17,
+        "overnight_pet_sitting": 140,
+        "dog_at_home": 75,
+        "cat_at_home": 25,
+        "holiday_rate_hotel": 30,
+        "holiday_rate_walk": 30,
+        "holiday_rate_overnight_hotel_hotel": 100
+    },
+    "ANKITA": {
+        "hotel": 28,
+        "walk": 28,
+        "overnight_hotel": 90,
+        "cat_visit": 30,
+        "pet_sitting_hourly": 20,  # Special rate: 20 PLN/hour
+        "overnight_pet_sitting": 140,
+        "dog_at_home": 75,
+        "cat_at_home": 25,
+        "holiday_rate_hotel": 32,      # Holiday rate for hotel work (higher base rate)
+        "holiday_rate_walk": 32,       # Holiday rate for walk work (higher base rate)
+        "holiday_rate_overnight_hotel_hotel": 100  # Holiday rate for overnight work
+    },
+    "PIYUSH": {
+        "hotel": 28,
+        "walk": 28,
+        "overnight_hotel": 90,
+        "cat_visit": 30,
+        "pet_sitting_hourly": 17,
+        "overnight_pet_sitting": 140,
+        "dog_at_home": 75,
+        "cat_at_home": 25,
+        "holiday_rate_hotel": 32,
+        "holiday_rate_walk": 32,
+        "holiday_rate_overnight_hotel_hotel": 100
+    },
+    "PRACHI": {
+        "hotel": 28,
+        "walk": 28,
+        "overnight_hotel": 90,
+        "cat_visit": 30,
+        "pet_sitting_hourly": 17,
+        "overnight_pet_sitting": 140,
+        "dog_at_home": 75,
+        "cat_at_home": 25,
+        "management": 30,
+        "holiday_rate_hotel": 32,
+        "holiday_rate_walk": 32,
+        "holiday_rate_overnight_hotel_hotel": 100
+    },
+    "SEAN": {
+        "hotel": 25,
+        "walk": 25,
+        "overnight_hotel": 90,
+        "cat_visit": 30,
+        "pet_sitting_hourly": 17,
+        "overnight_pet_sitting": 140,
+        "dog_at_home": 75,
+        "cat_at_home": 25,
+        "holiday_rate_hotel": 30,
+        "holiday_rate_walk": 30,
+        "holiday_rate_overnight_hotel_hotel": 100
+    },
+    "YASH": {
+        "hotel": 25,
+        "walk": 25,
+        "overnight_hotel": 90,
+        "cat_visit": 30,
+        "pet_sitting_hourly": 17,
+        "overnight_pet_sitting": 140,
+        "dog_at_home": 75,
+        "cat_at_home": 25,
+        "holiday_rate_hotel": 30,
+        "holiday_rate_walk": 30,
+        "holiday_rate_overnight_hotel_hotel": 100
+    },
+    "NAREYA": {
+        "hotel": 25,
+        "walk": 25,
+        "overnight_hotel": 90,
+        "cat_visit": 30,
+        "pet_sitting_hourly": 17,
+        "overnight_pet_sitting": 140,
+        "dog_at_home": 75,
+        "cat_at_home": 25,
+        "holiday_rate_hotel": 30,
+        "holiday_rate_walk": 30,
+        "holiday_rate_overnight_hotel_hotel": 100
+    },
+    "ERAY": {
+        "hotel": 25,
+        "walk": 25,
+        "overnight_hotel": 90,
+        "cat_visit": 30,
+        "pet_sitting_hourly": 17,
+        "overnight_pet_sitting": 140,
+        "dog_at_home": 75,
+        "cat_at_home": 25,
+        "management": 30,
+        "holiday_rate_hotel": 30,
+        "holiday_rate_walk": 30,
+        "holiday_rate_overnight_hotel_hotel": 100
+    },
+    "OGUZ": {
+        "hotel": 25,
+        "walk": 25,
+        "overnight_hotel": 90,
+        "cat_visit": 30,
+        "pet_sitting_hourly": 17,
+        "overnight_pet_sitting": 140,
+        "dog_at_home": 75,
+        "cat_at_home": 25,
+        "transport": 25,
+        "transport_km": 1.5,
+        "holiday_rate_hotel": 30,
+        "holiday_rate_walk": 30,
+        "holiday_rate_overnight_hotel_hotel": 100
+    },
+    "WERONIKA": {
+        "hotel": 25,
+        "walk": 25,
+        "overnight_hotel": 90,
+        "cat_visit": 30,
+        "pet_sitting_hourly": 17,
+        "overnight_pet_sitting": 140,
+        "dog_at_home": 75,
+        "cat_at_home": 25,
+        "management": 30,
+        "transport": 25,
+        "transport_km": 1.15,
+        "training": 100,
+        "holiday_rate_hotel": 30,
+        "holiday_rate_walk": 30,
+        "holiday_rate_overnight_hotel_hotel": 100
+    }
 }
 
 # Job type restrictions - controls which employees can access specific job types
-# Real restrictions are loaded from job_type_restrictions.json file at startup
 # Format: "job_type": ["employee1", "employee2", ...] or "job_type": "all" for all employees
 JOB_TYPE_RESTRICTIONS = {
-    # Real restriction data is loaded from job_type_restrictions.json at startup
-    # This dict serves as fallback for unrestricted access
+    "training": ["WERONIKA"],  # Only Weronika can do training by default
+    # "management": ["PRACHI", "ERAY"],  # Example: Only specific employees can do management
+    # Add more job type restrictions as needed
 }
 
 def _save_restrictions_to_file():
@@ -205,8 +388,66 @@ def _load_pet_rates_from_file():
 # Load pet rates from file on module import
 _load_pet_rates_from_file()
 
-def get_employee_rate(employee_name, job_type, pet_names=None):
-    """Get the rate for a specific employee and job type, considering pet-specific rates"""
+# Holiday dates persistence functions
+def _save_holiday_dates_to_file():
+    """Save current holiday dates to JSON file"""
+    try:
+        with open(HOLIDAY_DATES_FILE, 'w') as f:
+            json.dump({"holiday_dates": HOLIDAY_DATES}, f, indent=2)
+        return True
+    except Exception as e:
+        print(f"Error saving holiday dates: {e}")
+        return False
+
+def _load_holiday_dates_from_file():
+    """Load holiday dates from JSON file"""
+    global HOLIDAY_DATES
+    try:
+        if os.path.exists(HOLIDAY_DATES_FILE):
+            with open(HOLIDAY_DATES_FILE, 'r') as f:
+                data = json.load(f)
+                HOLIDAY_DATES = data.get("holiday_dates", [])
+        return True
+    except Exception as e:
+        print(f"Error loading holiday dates: {e}")
+        return False
+
+def add_holiday_date(date_str):
+    """Add a date as a holiday"""
+    if date_str not in HOLIDAY_DATES:
+        HOLIDAY_DATES.append(date_str)
+        _save_holiday_dates_to_file()
+        return True
+    return False
+
+def remove_holiday_date(date_str):
+    """Remove a holiday date"""
+    if date_str in HOLIDAY_DATES:
+        HOLIDAY_DATES.remove(date_str)
+        _save_holiday_dates_to_file()
+        return True
+    return False
+
+def is_holiday(date_str):
+    """Check if a date is a holiday"""
+    return date_str in HOLIDAY_DATES
+
+def get_all_holiday_dates():
+    """Get list of all holiday dates"""
+    return HOLIDAY_DATES.copy()
+
+# Load holiday dates from file on module import
+_load_holiday_dates_from_file()
+
+def get_employee_rate(employee_name, job_type, pet_names=None, date_str=None):
+    """Get the rate for a specific employee and job type, considering pet-specific rates and holiday dates
+    
+    Args:
+        employee_name: Name of the employee
+        job_type: Type of job
+        pet_names: Optional pet names for pet-specific rates
+        date_str: Date string in YYYY-MM-DD format to check for holiday rates
+    """
     if employee_name not in EMPLOYEES:
         raise ValueError(f"Employee {employee_name} not found")
     
@@ -231,6 +472,15 @@ def get_employee_rate(employee_name, job_type, pet_names=None):
         for pet_name in pet_names:
             if pet_name in PET_CUSTOM_RATES and job_type in PET_CUSTOM_RATES[pet_name]:
                 return PET_CUSTOM_RATES[pet_name][job_type]
+    
+    # Check if this is a holiday date and use holiday rate if available
+    if date_str and is_holiday(date_str):
+        holiday_job_type = f"holiday_rate_{job_type}"
+        if holiday_job_type in EMPLOYEES[employee_name]:
+            return EMPLOYEES[employee_name][holiday_job_type]
+        # If job type is overnight_hotel, check for holiday_rate_overnight_hotel
+        elif job_type == "overnight_hotel" and "holiday_rate_overnight_hotel" in EMPLOYEES[employee_name]:
+            return EMPLOYEES[employee_name]["holiday_rate_overnight_hotel"]
     
     # Use employee's standard rate
     if job_type not in EMPLOYEES[employee_name]:
@@ -354,7 +604,7 @@ def add_employee(name, rates=None):
             "cat_at_home": 25,
             "holiday_rate_hotel": 30,
             "holiday_rate_walk": 30,
-            "holiday_rate_overnight": 100
+            "holiday_rate_overnight_hotel_hotel": 100
         }
     
     EMPLOYEES[name] = rates
@@ -441,7 +691,7 @@ def remove_custom_rate(employee_name, job_type):
             "cat_visit": 30, "pet_sitting_hourly": 17, "overnight_pet_sitting": 140,
             "dog_at_home": 75, "cat_at_home": 25, "management": 30, "transport": 25,
             "transport_km": 1.0,  # Default KM rate
-            "holiday_rate_hotel": 30, "holiday_rate_walk": 30, "holiday_rate_overnight": 100
+            "holiday_rate_hotel": 30, "holiday_rate_walk": 30, "holiday_rate_overnight_hotel_hotel": 100
         }
         if job_type in standard_rates:
             EMPLOYEES[employee_name][job_type] = standard_rates[job_type]
@@ -488,7 +738,7 @@ def get_holiday_rate(employee_name, job_type):
     holiday_rate_mapping = {
         "hotel": "holiday_rate_hotel",
         "walk": "holiday_rate_walk", 
-        "overnight_hotel": "holiday_rate_overnight"
+        "overnight_hotel": "holiday_rate_overnight_hotel"
     }
     
     if job_type not in holiday_rate_mapping:
