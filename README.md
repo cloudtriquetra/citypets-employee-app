@@ -72,7 +72,7 @@ streamlit run main.py
 
 The application will be available at `http://localhost:8501`
 
-## � First-Time Setup & Login
+## 🔑 First-Time Setup & Login
 
 ### Initial Admin Setup
 
@@ -331,7 +331,7 @@ The application supports automatic rate switching for designated holiday dates. 
 3. **Communication**: Inform employees about holiday rate policies
 4. **Regular Review**: Update holiday dates annually for new year
 
-## �🚀 Deployment
+## 🚀 Deployment
 
 ### Local Deployment (Tested & Recommended)
 - Perfect for small teams and local use
