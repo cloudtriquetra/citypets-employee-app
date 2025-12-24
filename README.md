@@ -248,7 +248,7 @@ Once logged in, you'll see different menu options based on your role:
 - 📊 Reports (Comprehensive Analytics)
 - 📁 Data Export
 - 👥 Employee Management (Rates & Job Access)
-- �️ Holiday Management (Holiday Dates & Rates)
+- 📅 Holiday Management (Holiday Dates & Rates)
 - �🔐 User Management (Account Creation)
 
 ## 🔐 Security Features
@@ -273,7 +273,7 @@ Once logged in, you'll see different menu options based on your role:
 2. **🥈 Employee-Specific Rates** (Medium Priority) - Individual employee rates
 3. **🥉 Standard Base Rates** (Lowest Priority) - Default fallback rates
 
-## �️ Holiday Rate Management
+## 📅 Holiday Rate Management
 
 ### Overview
 The application supports automatic rate switching for designated holiday dates. When employees submit timesheets for work performed on holidays, the system automatically applies higher holiday rates instead of standard rates.
