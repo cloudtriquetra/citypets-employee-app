@@ -4,7 +4,7 @@ A comprehensive Streamlit-based timesheet management system designed for pet car
 
 ## ✨ Key Features
 
-### � **Employee Management**
+### 👥 **Employee Management**
 - Multi-employee support with individual hourly rates
 - Job-specific access controls and restrictions
 - Custom rates for specific pets/clients
@@ -117,7 +117,7 @@ The application uses a secure user authentication system. On the **first run**, 
 - Strong password requirements enforced
 - Session tokens for secure authentication
 
-## �🔧 Configuration Guide
+## 🔧 Configuration Guide
 
 ### Employee Configuration (`employees_config.json`)
 
