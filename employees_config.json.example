@@ -8,10 +8,13 @@
     "overnight_pet_sitting": 140,
     "dog_at_home": 75,
     "cat_at_home": 25,
+    "holiday_rate_hotel": 30,
+    "holiday_rate_overnight_hotel": 100,
     "training": 28,
     "management": 30,
     "transport": 25,
     "transport_km": 2.5,
+    "household_work": 20,
     "expense": 0
   },
   "EMPLOYEE_2": {
@@ -23,10 +26,13 @@
     "overnight_pet_sitting": 140,
     "dog_at_home": 80,
     "cat_at_home": 28,
+    "holiday_rate_hotel": 33,
+    "holiday_rate_overnight_hotel": 100,
     "training": 30,
     "management": 35,
     "transport": 28,
     "transport_km": 2.5,
+    "household_work": 20,
     "expense": 0
   },
   "EMPLOYEE_3": {
@@ -38,10 +44,13 @@
     "overnight_pet_sitting": 120,
     "dog_at_home": 65,
     "cat_at_home": 22,
+    "holiday_rate_hotel": 27,
+    "holiday_rate_overnight_hotel": 100,
     "training": 25,
     "management": 28,
     "transport": 22,
     "transport_km": 2.0,
+    "household_work": 20,
     "expense": 0
   }
 }
