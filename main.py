@@ -1995,8 +1995,14 @@ def render_admin_dashboard():
                         end_dt = pd.to_datetime(row['end_time'], errors='coerce')
                         
                         date_str = start_dt.strftime('%d-%b-%y') if pd.notna(start_dt) else 'N/A'
-                        start_time = start_dt.strftime('%H:%M') if pd.notna(start_dt) else ''
-                        end_time = end_dt.strftime('%H:%M') if pd.notna(end_dt) else ''
+                        
+                        # For day-based services, show only date (not time)
+                        if row['job_type'] in ['dog_at_home', 'cat_at_home']:
+                            start_time = start_dt.strftime('%d-%b-%y') if pd.notna(start_dt) else ''
+                            end_time = end_dt.strftime('%d-%b-%y') if pd.notna(end_dt) else ''
+                        else:
+                            start_time = start_dt.strftime('%H:%M') if pd.notna(start_dt) else ''
+                            end_time = end_dt.strftime('%H:%M') if pd.notna(end_dt) else ''
                     except:
                         date_str = 'N/A'
                         start_time = ''
@@ -2529,13 +2535,21 @@ def render_admin_dashboard():
                         # Format start/end times
                         try:
                             start_time = pd.to_datetime(row['start_time'], format='mixed', errors='coerce')
-                            start_str = start_time.strftime('%H:%M') if not pd.isna(start_time) else ''
+                            # For day-based services, show only date (not time)
+                            if row['job_type'] in ['dog_at_home', 'cat_at_home']:
+                                start_str = start_time.strftime('%d-%b-%y') if not pd.isna(start_time) else ''
+                            else:
+                                start_str = start_time.strftime('%H:%M') if not pd.isna(start_time) else ''
                         except:
                             start_str = ''
                         
                         try:
                             end_time = pd.to_datetime(row['end_time'], format='mixed', errors='coerce')
-                            end_str = end_time.strftime('%H:%M') if not pd.isna(end_time) else ''
+                            # For day-based services, show only date (not time)
+                            if row['job_type'] in ['dog_at_home', 'cat_at_home']:
+                                end_str = end_time.strftime('%d-%b-%y') if not pd.isna(end_time) else ''
+                            else:
+                                end_str = end_time.strftime('%H:%M') if not pd.isna(end_time) else ''
                         except:
                             end_str = ''
                         
@@ -3608,6 +3622,13 @@ def render_reports_page():
                         display_emp_data['Start Time'] = display_emp_data['start_time'].astype(str) 
                         display_emp_data['End Time'] = display_emp_data['end_time'].astype(str)
                         
+                        # For dog_at_home and cat_at_home, show only date (no time)
+                        day_based_mask = display_emp_data['job_type'].isin(['dog_at_home', 'cat_at_home'])
+                        if day_based_mask.any():
+                            # Show only the date portion for day-based services
+                            display_emp_data.loc[day_based_mask, 'Start Time'] = display_emp_data.loc[day_based_mask, 'start_time'].astype(str).str[:10]
+                            display_emp_data.loc[day_based_mask, 'End Time'] = display_emp_data.loc[day_based_mask, 'end_time'].astype(str).str[:10]
+                        
                         # For overnight entries, still show raw values but indicate they're overnight
                         overnight_mask = display_emp_data['job_type'].isin(['overnight_pet_sitting', 'overnight_hotel'])
                         if overnight_mask.any():
@@ -4469,7 +4490,11 @@ def render_manage_records(current_user):
             try:
                 parsed_start = pd.to_datetime(row['start_time'], format='mixed', errors='coerce')
                 date_str = parsed_start.strftime('%d-%b-%y') if not pd.isna(parsed_start) else 'Invalid'
-                start_time_str = parsed_start.strftime('%H:%M') if not pd.isna(parsed_start) else 'Invalid'
+                # For day-based services, show only date (not time)
+                if row['job_type'] in ['dog_at_home', 'cat_at_home']:
+                    start_time_str = parsed_start.strftime('%d-%b-%y') if not pd.isna(parsed_start) else 'Invalid'
+                else:
+                    start_time_str = parsed_start.strftime('%H:%M') if not pd.isna(parsed_start) else 'Invalid'
             except:
                 date_str = 'Invalid'
                 start_time_str = 'Invalid'
@@ -4477,7 +4502,11 @@ def render_manage_records(current_user):
             # Parse end time
             try:
                 parsed_end = pd.to_datetime(row['end_time'], format='mixed', errors='coerce')
-                end_time_str = parsed_end.strftime('%H:%M') if not pd.isna(parsed_end) else 'Invalid'
+                # For day-based services, show only date (not time)
+                if row['job_type'] in ['dog_at_home', 'cat_at_home']:
+                    end_time_str = parsed_end.strftime('%d-%b-%y') if not pd.isna(parsed_end) else 'Invalid'
+                else:
+                    end_time_str = parsed_end.strftime('%H:%M') if not pd.isna(parsed_end) else 'Invalid'
             except:
                 end_time_str = 'Invalid'
             

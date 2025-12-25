@@ -2,6 +2,18 @@
 
 A comprehensive Streamlit-based timesheet management system designed for pet care businesses. Features employee time tracking, payroll management, mobile-optimized interface, and administrative dashboard with payment processing.
 
+## 🔄 Recent Updates
+
+### December 25, 2025 - Display Format Fix for Day-Based Services
+- **Fixed Bug**: Dog@home and Cat@home entries now correctly display only dates (not times) throughout the application
+- **Affected Areas**: 
+  - Employee Detail Report (Admin Dashboard)
+  - Admin Entry Selection View
+  - Payment Selection View
+  - Employee Delete Selection View
+- **Impact**: Day-based services now consistently show date ranges (e.g., "25-Dec-25" to "28-Dec-25") instead of time values like "9:00"
+- **Technical Details**: Added conditional formatting logic to detect job types `dog_at_home` and `cat_at_home` and display only the date portion in start/end time columns
+
 ## ✨ Key Features
 
 ### 👥 **Employee Management**
