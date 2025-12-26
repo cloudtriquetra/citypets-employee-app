@@ -803,7 +803,8 @@ def get_employees_allowed_for_job_type(job_type):
         if restrictions == "all":
             return list(EMPLOYEES.keys())
         elif isinstance(restrictions, list):
-            return restrictions.copy()
+            # Filter out offboarded employees (not in EMPLOYEES config)
+            return [emp for emp in restrictions if emp in EMPLOYEES]
     
     # No restrictions - all employees who have this job type in their rates
     allowed_employees = []
